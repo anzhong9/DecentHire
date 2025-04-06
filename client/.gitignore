@@ -1,0 +1,47 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# dependencies
+/node_modules
+
+# build output (Vite)
+dist
+
+# testing
+coverage
+
+# misc
+.DS_Store
+
+# local env files (optional, only if you use them later)
+.env*
+!.env.example
+
+# log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# contract artifacts (optional, adjust based on your project structure)
+src/contracts/*.json
