@@ -1,198 +1,191 @@
-import React, { useState, useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom';
-import ProposalCard from '../components/ProposalCard';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
+import ProposalCard from '../components/ProposalCard';
+import Loader from '../components/Loader';
+import AcceptProject from '../components/AcceptProject';
 import { useStateContext } from '../context/stateContext';
-import { calculateBarPercentage, daysLeft } from '../utils';
-import Loader from '../components/Loader'
-import AcceptProject from '../components/AcceptProject'
-const ProjectDetails =() => {
-  const { state } = useLocation();
-  const navigate = useNavigate();
-  const {createProposal, address,getProposalsFromContract,contract,approve} = useStateContext();
-  const [isLoading, setIsLoading] = useState(false);
-  const [buttonLoading, setButtonLoading] = useState(false)
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('')
-  const [proposalsAddress, setProposalAddress] = useState([]);
-  const [proposals, setProposals] = useState([]);
- 
+import { daysLeft } from '../utils';
 
-  const handleDescriptionChange = (event) => {
-    setDescription(event.target.value);
-  };
-  const handleAmountChange = (event) => {
-    setAmount(event.target.value);
-  };
- 
-  const getProposals = async() => {
+const ProjectDetails = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { createProposal, address, getProposalsFromContract, contract } = useStateContext();
+
+  const [project, setProject] = useState(null);
+  const [proposals, setProposals] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [buttonLoading, setButtonLoading] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+
+  const fetchProposals = async () => {
     try {
-      setIsLoading(true)
-      const data = await getProposalsFromContract(state.pId)
-      setProposals(data)
-      setIsLoading(false)
-    } catch(err) {
-      console.error("failed to get proposals", err);
+      setIsLoading(true);
+      const data = await getProposalsFromContract(project.pId);
+      setProposals(data || []);
+    } catch (err) {
+      console.error('Failed to fetch proposals:', err);
       setProposals([]);
-      setIsLoading(false) // set proposals to an empty array to avoid unexpected behavior
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
+
   useEffect(() => {
-    setProposalAddress(state.proposals)  
-    getProposals()
-  }, [address,contract])
-  const remainingDays = daysLeft(state.daysLeft);
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsLoading(true);
-      let id = state.pId
-      const form = {
-        id,
-        description,
-        amount
+    const stored = localStorage.getItem(`project-${id}`);
+    if (stored) {
+      setProject(JSON.parse(stored));
+    } else {
+      console.error("Project not found in localStorage");
+      navigate('/');
     }
-    // console.log(form)
-    const s = await createProposal({...form, amount: ethers.utils.parseUnits(form.amount, 18)}); 
-    setIsLoading(false);
-    navigate("/")
-    
-  }
+  }, [id]);
+
+  useEffect(() => {
+    if (contract && project) {
+      fetchProposals();
+    }
+  }, [address, contract, project]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!description || !amount) return;
+
+    try {
+      setButtonLoading(true);
+      const proposalData = {
+        id: project.pId,
+        description,
+        amount: amount,
+      };
+      await createProposal(proposalData);
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to submit proposal:', err);
+    } finally {
+      setButtonLoading(false);
+    }
+  };
+
+  if (!project) return <Loader />;
+
+  const isOwner = address === project.owner;
+  const isStarted = project.isAccepted;
+  const statusLabel = project.isApproved
+    ? project.status
+      ? 'completed'
+      : 'ongoing'
+    : 'new';
 
   return (
-    <div className='p-12'>
+    <div className="px-12 bg-black">
       {isLoading && <Loader />}
-      <div className="w-full flex md:flex-row flex-col mt-10 gap-[30px]">
-        <div className="flex-1 flex-col">
-          <img src={state.image} alt="campaign" className="w-full h-[410px] object-cover rounded-xl" />
-          {/* <div className="relative w-full h-[5px] bg-[#3a3a43] mt-2">
-            <div className="absolute h-full bg-[#4acd8d]" style={{ width: `${calculateBarPercentage(state.target, state.amountCollected)}%`, maxWidth: '100%' }}>
-            </div>
-          </div> */}
-        </div>
 
-        {/* <div className="flex md:w-[150px] w-full flex-wrap justify-between gap-[30px]">
-          <CountBox title="Days Left" value={remainingDays} />
-          <CountBox title={`Raised of ${state.target}`} value={state.amountCollected} />
-          <CountBox title="Total Backers" value={donators.length} />
-        </div> */}
+      <div className="w-full flex md:flex-row flex-col  gap-[30px]">
+        <div className="flex-1 mt-10 flex-col">
+          <img src={project.image} alt="project" className="w-full h-[310px] object-cover rounded-xl" />
+        </div>
       </div>
 
-      <div className="mt-[60px] flex lg:flex-row flex-col gap-5">
-        <div className="flex-[2] flex flex-col gap-[40px]">
-          <div>
-            <h4 className="font-epilogue font-semibold text-[18px] text-white uppercase">Owner</h4>
+      <div className="mt-5 flex lg:flex-row flex-col gap-5">
+        {/* Left Panel */}
+        <div className="flex-[2] flex flex-col gap-[30px] text-white">
+          <section>
+            <h4 className="font-semibold text-[18px] uppercase">Owner</h4>
+            <div className="mt-5">
+              <p className="break-all">{project.owner}</p>
+              <p className="text-sm text-[#808191]">2 Projects</p>
+              <p className="mt-2 inline-block bg-green-600 px-3 py-1 rounded-md text-sm capitalize">{statusLabel}</p>
+              {isOwner && project.isApproved && <AcceptProject />}
+            </div>
 
-            <div className="mt-[20px] flex flex-row items-center flex-wrap gap-[14px]">
-              <div className="w-[52px] h-[52px] flex items-center justify-center rounded-full bg-[#2c2f32] cursor-pointer">
+            {project.freelancer && (
+              <div className="mt-4">
+                <h5 className="text-sm text-[#999]">Assigned to:</h5>
+                <p className="break-all">{project.freelancer}</p>
               </div>
-              <div>
-                <h4 className="font-epilogue font-semibold text-[14px] text-white break-all">{state.owner}</h4>
-                <p className="mt-[4px] font-epilogue font-normal text-[12px] text-[#808191]">2 Projects</p>
-                
-              </div>
-              {console.log(state)}
-              <p className='bg-[green] px-2  rounded-md'>{
-             state.isApproved  && !state.status? "ongoing" : state.status ? "completed" : "new"
-          }</p>
-            {/* {console.log(state)} */}
-             { address == state.owner && state.isApproved  && < AcceptProject />}
-            </div>
-            
-           {state.freelancer && <div className='mt-2 text-white'>
-                 <h1>assigned to</h1>
-                <h4 className="font-epilogue font-semibold text-[14px] text-white break-all">{state.freelancer}</h4>
-              </div> }
-          </div>
+            )}
+          </section>
 
-          <div>
-            <h4 className="font-epilogue font-semibold text-[18px] text-white uppercase">Description</h4>
+          <section>
+            <h4 className="font-semibold text-[18px] uppercase">Description</h4>
+            <p className="mt-4 text-[#808191] leading-[26px]">{project.description}</p>
+          </section>
 
-            <div className="mt-[20px]">
-              <p className="font-epilogue font-normal text-[16px] text-[#808191] leading-[26px] text-justify">{state.description}</p>
-            </div>
-          </div>
-          <div>
-            <h4 className="font-epilogue font-semibold text-[18px] text-white uppercase">Budget</h4>
+          <section>
+            <h4 className="font-semibold text-[18px] uppercase">Budget</h4>
+            <p className="mt-4 text-[#808191]">{project.budget} ETH</p>
+          </section>
 
-            <div className="mt-[20px]">
-              <p className="font-epilogue font-normal text-[16px] text-[#808191] leading-[26px] text-justify">{state.budget} Matic</p>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-epilogue font-semibold text-[18px] text-white uppercase">Proposals</h4>
-            <div className="mt-[20px] flex flex-col gap-4">
-              {proposalsAddress && proposals ? proposals.map((item, index) => (
-                <div key={`${index}`} className="flex justify-between items-center gap-4">
-                  {console.log(state.freelancer)}
-                  <ProposalCard profilePic={item} description={item.description} amount={item.amount}  owner={proposalsAddress[index]} stateOwner={state.owner} index={index} isApproved={state.isApproved} isRejected={item.isRejected}/>
-                </div>
-              )) : (
-                <p className="font-epilogue font-normal text-[16px] text-[#808191] leading-[26px] text-justify">No Proposals yet. Be the first one!</p>
+          <section>
+            <h4 className="font-semibold text-[18px] uppercase">Proposals</h4>
+            <div className="mt-4 flex flex-col gap-4">
+              {proposals.length > 0 ? (
+                proposals.map((item, index) => (
+                  <ProposalCard
+                    key={index}
+                    profilePic={item}
+                    description={item.description}
+                    amount={item.amount}
+                    owner={item.freelancer}
+                    stateOwner={project.owner}
+                    index={index}
+                    isApproved={project.isApproved}
+                    isRejected={item.isRejected}
+                  />
+                ))
+              ) : (
+                <p className="text-[#808191]">No proposals yet. Be the first!</p>
               )}
             </div>
-          </div>
+          </section>
         </div>
 
+        {/* Right Panel */}
         <div className="flex-1">
-          <h4 className="font-epilogue font-semibold text-[18px] text-white uppercase">post proposals</h4>
+          <h4 className="font-semibold text-[18px] text-white uppercase">Post Proposal</h4>
+          <form
+            onSubmit={handleSubmit}
+            className="mt-5 flex flex-col p-4 bg-[#1c1c24] rounded-[10px] gap-4"
+          >
+            <textarea
+              placeholder="Proposal Description"
+              className="border rounded w-full p-3 text-white bg-transparent"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
 
-          <div className="mt-[20px] flex flex-col p-4 bg-[#1c1c24] rounded-[10px]">
-            <form onSubmit={handleSubmit} className="max-w-2xl ">
+            <input
+              type="number"
+              placeholder="Amount (MATIC)"
+              className="border rounded w-full p-3 text-white bg-transparent"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
 
-
-              <div className="mb-4">
-
-                <textarea
-                  type="description"
-                  placeholder="description"
-                  id="description"
-                  className="appearance-none border rounded w-full py-2 px-3 text-white leading-tight bg-inherit"
-                  value={description}
-                  onChange={handleDescriptionChange}
-                />
-              </div>
-              <div className="mb-4">
-
-
-                <input
-                  id="amount"
-                  placeholder="amount"
-                  className="appearance-none border rounded w-full py-2 px-3 text-white leading-tight bg-inherit"
-                  value={amount}
-                  onChange={handleAmountChange}
-                />
-                
-              </div>
-
-
-
-
-
-            {!state.isAccepted ? <div className="flex items-center justify-between">
-                
-                {address != state.owner ? <button
+            {!isStarted ? (
+              !isOwner ? (
+                <button
                   type="submit"
-                  className="bg-[#CB1C8D] hover:bg-[#fff] hover:text-[#CB1C8D] text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                  className="bg-[#CB1C8D] hover:bg-white hover:text-[#CB1C8D] text-white font-bold py-2 px-4 rounded"
+                  disabled={buttonLoading}
                 >
-                  {buttonLoading == true ? "Loading" : "post proposal" }
-                </button> : <p className='text-[#CB1C8D]'>owner cant post proposal</p>}
-              </div> :<p className='text-[#CB1C8D]'>project is already started</p>}
-
-            </form>
-          </div>
-          <div className="flex-1">
-          
-
-          
+                  {buttonLoading ? 'Submitting...' : 'Post Proposal'}
+                </button>
+              ) : (
+                <p className="text-[#CB1C8D]">Owner can't post proposals</p>
+              )
+            ) : (
+              <p className="text-[#CB1C8D]">Project already started</p>
+            )}
+          </form>
         </div>
-        </div>
-
-       
       </div>
-     
     </div>
-  )
-}
+  );
+};
 
-export default ProjectDetails
+export default ProjectDetails;

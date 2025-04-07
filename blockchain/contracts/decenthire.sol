@@ -24,7 +24,7 @@ contract DecentHire {
         mapping(address => Proposal) proposalMap;
     }
 
-    struct ProjectData {
+    struct ProjectView {
         address owner;
         string title;
         string description;
@@ -126,7 +126,6 @@ contract DecentHire {
 
         Proposal storage proposal = project.proposalMap[project.freelancer];
         require(proposal.isAccepted, "Proposal not accepted");
-
         require(msg.value == proposal.amount, "Incorrect payment amount");
 
         (bool sent, ) = payable(project.freelancer).call{value: msg.value}("");
@@ -151,26 +150,39 @@ contract DecentHire {
         return projects[_projectId].updates;
     }
 
-    function getProjects() external view returns (ProjectData[] memory) {
-        ProjectData[] memory allProjects = new ProjectData[](numberOfProjects);
-        for (uint256 i = 0; i < numberOfProjects; i++) {
-            Project storage p = projects[i];
-            allProjects[i] = ProjectData(
-                p.owner,
-                p.title,
-                p.description,
-                p.budget,
-                p.deadline,
-                p.image,
-                p.freelancer,
-                p.updates,
-                p.isApproved,
-                p.proposals,
-                p.status
-            );
+    function getProjects() external view returns (ProjectView[] memory) {
+    ProjectView[] memory allProjects = new ProjectView[](numberOfProjects);
+
+    for (uint256 i = 0; i < numberOfProjects; i++) {
+        Project storage p = projects[i];
+        string[] memory updates = new string[](p.updates.length);
+        for (uint j = 0; j < p.updates.length; j++) {
+            updates[j] = p.updates[j];
         }
-        return allProjects;
+
+        address[] memory proposals = new address[](p.proposals.length);
+        for (uint j = 0; j < p.proposals.length; j++) {
+            proposals[j] = p.proposals[j];
+        }
+
+        allProjects[i] = ProjectView(
+            p.owner,
+            p.title,
+            p.description,
+            p.budget,
+            p.deadline,
+            p.image,
+            p.freelancer,
+            updates,
+            p.isApproved,
+            proposals,
+            p.status
+        );
     }
+
+    return allProjects;
+}
+
 
     function getProposals(uint256 _projectId) external view returns (Proposal[] memory) {
         require(_projectId < numberOfProjects, "Invalid project ID");

@@ -3,6 +3,8 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
+  console.log("🚀 Deploying contracts...");
+
   // Deploy DecentHire
   const DecentHire = await hre.ethers.getContractFactory("DecentHire");
   const decentHire = await DecentHire.deploy();
@@ -17,29 +19,30 @@ async function main() {
   const userProfileAddress = await userProfile.getAddress();
   console.log("✅ UserProfile deployed to:", userProfileAddress);
 
-  // Export addresses and ABIs to frontend
+  // Set up output directory
   const contractsDir = path.resolve(__dirname, "../../client/src/contracts");
-
   if (!fs.existsSync(contractsDir)) {
     fs.mkdirSync(contractsDir, { recursive: true });
   }
 
+  // Save contract addresses
+  const addresses = {
+    decentHire: decentHireAddress,
+    userProfile: userProfileAddress,
+  };
   fs.writeFileSync(
-    path.join(contractsDir, "decentHire-address.json"),
-    JSON.stringify({ address: decentHireAddress }, null, 2)
-  );
-  fs.writeFileSync(
-    path.join(contractsDir, "userProfile-address.json"),
-    JSON.stringify({ address: userProfileAddress }, null, 2)
+    path.join(contractsDir, "contract-addresses.json"),
+    JSON.stringify(addresses, null, 2)
   );
 
+  // Save ABIs
   const decentHireArtifact = await hre.artifacts.readArtifact("DecentHire");
-  const userProfileArtifact = await hre.artifacts.readArtifact("UserProfile");
-
   fs.writeFileSync(
     path.join(contractsDir, "decentHire-abi.json"),
     JSON.stringify(decentHireArtifact.abi, null, 2)
   );
+
+  const userProfileArtifact = await hre.artifacts.readArtifact("UserProfile");
   fs.writeFileSync(
     path.join(contractsDir, "userProfile-abi.json"),
     JSON.stringify(userProfileArtifact.abi, null, 2)
@@ -49,6 +52,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("❌ Error:", error);
+  console.error("❌ Deployment failed:", error);
   process.exit(1);
 });

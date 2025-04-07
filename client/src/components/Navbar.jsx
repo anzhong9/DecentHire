@@ -1,37 +1,90 @@
-import React from "react";
-import { ConnectWallet } from '@thirdweb-dev/react';
+import React, { useState } from "react";
 import { useStateContext } from "../context/stateContext";
+import { Link } from "react-router-dom";
 
 const navlinks = [
-    { name: "Home", href: "/", sublist: [{name:"blah",href:"/"}, {}, {}] },
-    { name: "Profile", href: "/Profile", sublist: [{name:"blah",href:"/"}, {name:"blah",href:"/"}, {name:"blah",href:"/"}] },
-    { name: "Projects", href: "/projects", sublist: [{}, {}, {}] },
-
+  { name: "Home", href: "/" },
+  { name: "Profile", href: "/profile" },
+  { name: "Projects", href: "/projects" },
 ];
 
-function Navbar() {
+const Navbar = () => {
+  const { address, connectWallet, disconnectWallet } = useStateContext();
+  const [showConfirm, setShowConfirm] = useState(false);
 
-    // const { connect, address } = useStateContext()
-    return (
+  const handleDisconnect = () => {
+    setShowConfirm(true);
+  };
 
-        <div>
-            <div className="flex  text-center  pt-6  justify-evenly text-white ">
-                <div className="my-auto text-4xl">
-                   <a href="/">Pro<span className="text-[#CB1C8D]">Gigs</span> </a> 
-                </div>
-                <div className="flex">
-                    {navlinks.map((data) => (
-                            <div className=" px-5 py-2 text-center my-auto hover:bg-[#751051] rounded-md" >
-                             <a href={data.href} className="">{data.name}</a>
-                            </div>
-                    ))}
-                </div>
-                <div>
-                   <ConnectWallet accentColor="#CB1C8D" />
-                </div>
-            </div>
-        </div>
-    );
-}
+  const confirmDisconnect = () => {
+    disconnectWallet();
+    setShowConfirm(false);
+  };
 
-export default Navbar;  
+  const cancelDisconnect = () => {
+    setShowConfirm(false);
+  };
+
+  return (
+    <div className="w-full px-6 py-4 flex justify-between items-center bg-black text-white shadow-md relative">
+      <Link to="/" className="text-3xl font-bold">
+        DecentHire
+      </Link>
+
+      <div className="flex gap-4">
+        {navlinks.map((link, i) => (
+          <Link
+            key={i}
+            to={link.href}
+            className="hover:bg-[#751051] px-4 py-2 rounded-md transition"
+          >
+            {link.name}
+          </Link>
+        ))}
+      </div>
+
+      <div>
+        {address ? (
+          <>
+            <button
+              onClick={handleDisconnect}
+              className="bg-[#CB1C8D] hover:bg-[#a0126d] px-4 py-2 rounded-xl text-white transition"
+            >
+              {address.slice(0, 6)}...{address.slice(-4)}
+            </button>
+
+            {/* Popup Confirm */}
+            {showConfirm && (
+              <div className="absolute top-20 right-6 bg-white text-black p-4 rounded shadow-lg z-50">
+                <p className="mb-3">Disconnect wallet?</p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={confirmDisconnect}
+                    className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={cancelDisconnect}
+                    className="bg-gray-300 px-3 py-1 rounded hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <button
+            onClick={connectWallet}
+            className="bg-[#CB1C8D] hover:bg-[#a0126d] px-4 py-2 rounded-xl text-white transition"
+          >
+            Connect Wallet
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Navbar;
