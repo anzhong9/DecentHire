@@ -1,39 +1,48 @@
 import { useMemo } from 'react';
 import { Contract, BrowserProvider } from 'ethers';
-import DecentHireABI from '../contracts/decentHire-abi.json';
-import DecentHireAddress from '../contracts/decentHire-address.json';
 import UserProfileABI from '../contracts/userProfile-abi.json';
-import UserProfileAddress from '../contracts/userProfile-address.json';
+import SimpleJobContractABI from '../contracts/SimpleJobContract-abi.json';
+import SimpleMilestoneContractABI from '../contracts/SimpleMilestoneContract-abi.json';
+import contractAddresses from '../contracts/contract-addresses.json';
 
 export const useContracts = () => {
-  const contracts = useMemo(() => {
+  return useMemo(() => {
     if (typeof window === 'undefined' || !window.ethereum) {
-      console.warn('MetaMask not detected');
-      return {};
+      console.warn('Ethereum provider not found');
+      return null;
     }
 
     const provider = new BrowserProvider(window.ethereum);
 
-    const getContracts = async () => {
-      const signer = await provider.getSigner();
-
-      const decentHire = new Contract(
-        DecentHireAddress.address,
-        DecentHireABI,
-        signer
-      );
-
-      const userProfile = new Contract(
-        UserProfileAddress.address,
-        UserProfileABI,
-        signer
-      );
-
-      return { provider, signer, decentHire, userProfile };
+    return {
+      getContracts: async () => {
+        try {
+          const signer = await provider.getSigner();
+          
+          return {
+            userProfile: new Contract(
+              contractAddresses.userProfile,
+              UserProfileABI,
+              signer
+            ),
+            jobContract: new Contract(
+              contractAddresses.jobContract,
+              SimpleJobContractABI,
+              signer
+            ),
+            milestoneContract: new Contract(
+              contractAddresses.milestoneContract,
+              SimpleMilestoneContractABI,
+              signer
+            ),
+            provider,
+            signer
+          };
+        } catch (error) {
+          console.error('Error getting contracts:', error);
+          throw error;
+        }
+      }
     };
-
-    return getContracts(); // This returns a Promise
   }, []);
-
-  return contracts; // Now returns a Promise
 };

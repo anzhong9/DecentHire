@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStateContext } from '../context/stateContext';
 import { useNavigate } from 'react-router-dom';
 
 const UpdateProfile = () => {
-  const { updateProfile, address, contractsReady } = useStateContext(); // 👈 added contractsReady
+  const { updateProfile, address, contractsReady, getProfile } = useStateContext(); // 👈 added getProfile
   const [form, setForm] = useState({
     name: '',
     image: '',
@@ -14,6 +14,25 @@ const UpdateProfile = () => {
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (address) {
+        const profile = await getProfile();
+        if (profile) {
+          setForm({
+            name: profile.name || '',
+            image: profile.image || '',
+            about: profile.about || '',
+            email: profile.mail || '',
+            twitter: profile.twitter || '',
+            github: profile.github || '',
+          });
+        }
+      }
+    };
+    fetchProfile();
+  }, [address, getProfile]);
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -38,8 +57,8 @@ const UpdateProfile = () => {
     try {
       setLoading(true);
       await updateProfile({
-        title: form.name,
-        description: form.about,
+        name: form.name,
+        about: form.about,
         image: form.image,
         mail: form.email,
         twitter: form.twitter,

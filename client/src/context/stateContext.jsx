@@ -1,259 +1,101 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import {
-  BrowserProvider,
-  Contract,
-  parseEther,
-  formatEther,
-  ethers,
-} from "ethers";
-
-import DecentHireAbi from "../contracts/decentHire-abi.json";
-import UserProfileAbi from "../contracts/userProfile-abi.json";
-import addresses from "../contracts/contract-addresses.json";
-
-// Make sure these match your latest deployed contract addresses
-const DECENT_HIRE_ADDRESS = addresses.decentHire;
-const USER_PROFILE_ADDRESS = addresses.userProfile;
+import React, { createContext, useContext, useState } from 'react';
+import { ethers } from 'ethers';
+import { useContracts } from '../hooks/useContracts'; // Assuming this hook handles the contract logic
 
 const StateContext = createContext();
 
-export const StateContextProvider = ({ children }) => {
-  const [address, setAddress] = useState("");
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
-  const [decentHire, setDecentHire] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
+export const useStateContext = () => {
+  return useContext(StateContext);
+};
 
-  // Connect Wallet
+export const StateContextProvider = ({ children }) => {
+  const [address, setAddress] = useState(null);
+  const [contracts, setContracts] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [contractsReady, setContractsReady] = useState(false);
+  const { getContracts } = useContracts(); // Custom hook to fetch contract instances
+  
+  // Connect wallet logic
   const connectWallet = async () => {
     try {
-      if (!window.ethereum) return alert("Please install MetaMask");
-
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-
-      const _provider = new BrowserProvider(window.ethereum);
-      const _signer = await _provider.getSigner();
-
-      setAddress(accounts[0]);
-      setProvider(_provider);
-      setSigner(_signer);
-
-      console.log("[connectWallet] Connected:", accounts[0]);
-    } catch (err) {
-      console.error("[connectWallet] Failed:", err);
+      setIsLoading(true);
+      if (!window.ethereum) throw new Error('MetaMask not installed');
+      
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send('eth_requestAccounts', []);  // Request the user to connect their wallet
+      const signer = provider.getSigner();  // Get the signer
+      const address = await (await signer).getAddress();  // Use signer to get the address
+      setAddress(address);
+      
+      const contracts = await getContracts(signer);  // Pass signer to contract hooks
+      setContracts(contracts);
+      setContractsReady(true);
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  // Disconnect Wallet
+  
+  // Disconnect wallet logic
   const disconnectWallet = () => {
-    setAddress("");
-    setProvider(null);
-    setSigner(null);
-    setDecentHire(null);
-    setUserProfile(null);
-    console.log("[disconnectWallet] Wallet disconnected");
+    setAddress(null);
+    setContracts(null);
+    setContractsReady(false);  // Reset contracts when disconnected
   };
 
-  // Initialize Contracts
-  useEffect(() => {
-    if (!signer) return;
-
-    const hire = new Contract(DECENT_HIRE_ADDRESS, DecentHireAbi, signer);
-    const profile = new Contract(USER_PROFILE_ADDRESS, UserProfileAbi, signer);
-
-    setDecentHire(hire);
-    setUserProfile(profile);
-
-    console.log("[Contracts] DecentHire @", DECENT_HIRE_ADDRESS);
-    console.log("[Contracts] UserProfile @", USER_PROFILE_ADDRESS);
-  }, [signer]);
-
-  // Optional sanity check
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const test = await decentHire.getProjects();
-        console.log("[pingContract] getProjects call succeeded:", test.length);
-      } catch (err) {
-        console.error("[pingContract] Failed to fetch projects:", err);
-      }
-    };
-
-    if (decentHire) {
-      fetchProjects();
+  // Profile management logic (interacting with the userProfile contract)
+  const updateProfile = async ({ name, about, image, mail, twitter, github }) => {
+    if (!contracts?.userProfile) {
+      throw new Error("User profile contract not available.");
     }
-  }, [decentHire]);
-
-  // Profile Methods
-  const updateProfile = async (form) => {
+  
     try {
-      const tx = await userProfile.updateUserProfile(
-        form.title,
-        form.description,
-        form.image,
-        form.mail,
-        form.twitter,
-        form.github
-      );
+      const tx = await contracts.userProfile.updateUserProfile(name, about, image, mail, twitter, github);
       await tx.wait();
-      console.log("✅ Profile updated");
+      console.log('Profile updated successfully');
     } catch (err) {
-      console.error("[updateProfile] Failed:", err);
+      console.error("Error updating profile:", err);
+      throw new Error("Error updating profile: " + err.message);
     }
   };
-
+  
   const getProfile = async () => {
+    if (!contracts?.userProfile || !address) return null;
+
     try {
-      if (!userProfile || !address) return null;
-      const profile = await userProfile.getUserProfile(address);
-      console.log("[getProfile] Data:", profile);
-      return profile;
+      const profile = await contracts.userProfile.getUserProfile(address);
+      console.log('Profile fetched successfully:', profile);
+      return {
+        name: profile[0],
+        image: profile[1],
+        about: profile[2],
+        mail: profile[3],
+        twitter: profile[4],
+        github: profile[5],
+      };
     } catch (err) {
-      console.error("[getProfile] Failed:", err);
+      console.error('Error fetching profile:', err);
       return null;
     }
   };
 
-  // Project Methods
-  const createProject = async (form) => {
-    try {
-      const tx = await decentHire.postProject(
-        form.title,
-        form.description,
-        ethers.parseEther(form.budget),
-        Math.floor(new Date(form.deadline).getTime() / 1000),
-        form.image
-      );
-      const receipt = await tx.wait(); // this will throw if reverted
-      console.log("✅ Project created", receipt);
-    } catch (err) {
-      console.error("❌ Project creation failed:", err);
-  
-      if (err?.error?.message) {
-        console.error("Error reason:", err.error.message);
-      } else if (err?.data?.message) {
-        console.error("Error reason:", err.data.message);
-      } else if (err?.reason) {
-        console.error("Error reason:", err.reason);
-      }
-    }
-  };
-  
-
-  const getProjects = async () => {
-    try {
-      const projects = await decentHire.getProjects();
-      return projects.map((p, i) => ({
-        owner: p.owner,
-        title: p.title,
-        description: p.description,
-        budget: formatEther(p.budget),
-        deadline: Number(p.deadline),
-        image: p.image,
-        freelancer: p.freelancer,
-        updates: p.updates,
-        isApproved: p.isApproved,
-        proposals: p.proposals,
-        status: p.status,
-        pId: i,
-      }));
-    } catch (err) {
-      console.error("[getProjects] Failed:", err);
-      return [];
-    }
-  };
-
-  // Proposal Methods
-  const createProposal = async (form) => {
-    try {
-      const tx = await decentHire.postProposal(
-        form.id,
-        form.description,
-        parseEther(form.amount)
-      );
-      await tx.wait();
-      console.log("✅ Proposal created");
-    } catch (err) {
-      console.error("[createProposal] Failed:", err);
-    }
-  };
-
-  const getProposalsFromContract = async (_projectId) => {
-    try {
-      const proposals = await decentHire.getProposals(_projectId);
-      return proposals.map((p, i) => ({
-        description: p.description,
-        amount: formatEther(p.amount),
-        isAccepted: p.isAccepted,
-        isRejected: p.isRejected,
-        pId: i,
-      }));
-    } catch (err) {
-      console.error("[getProposals] Failed:", err);
-      return [];
-    }
-  };
-
-  // Owner Actions
-  const approve = async (_projectId, _proposalOwner) => {
-    try {
-      const tx = await decentHire.approveProposal(_projectId, _proposalOwner);
-      await tx.wait();
-      console.log("✅ Proposal approved");
-    } catch (err) {
-      console.error("[approveProposal] Failed:", err);
-    }
-  };
-
-  const reject = async (_projectId, _proposalOwner) => {
-    try {
-      const tx = await decentHire.rejectProposal(_projectId, _proposalOwner);
-      await tx.wait();
-      console.log("✅ Proposal rejected");
-    } catch (err) {
-      console.error("[rejectProposal] Failed:", err);
-    }
-  };
-
-  // Freelancer Accepts Project
-  const acceptProject = async (_projectId, amount) => {
-    try {
-      const tx = await decentHire.AcceptProject(_projectId, {
-        value: parseEther(amount),
-      });
-      await tx.wait();
-      console.log("✅ Project accepted");
-    } catch (err) {
-      console.error("[acceptProject] Failed:", err);
-    }
-  };
-
-  const contractsReady = Boolean(decentHire && userProfile);
+  // Get contract readiness state
+  const checkContractsReady = () => contractsReady;
 
   return (
-    <StateContext.Provider
-      value={{
-        address,
-        connectWallet,
-        disconnectWallet,
-        createProject,
-        getProjects,
-        updateProfile,
-        getProfile,
-        createProposal,
-        getProposalsFromContract,
-        approve,
-        reject,
-        acceptProject,
-        contractsReady,
-        contractAddress: DECENT_HIRE_ADDRESS,
-      }}
-    >
+    <StateContext.Provider value={{
+      address,
+      contracts,
+      isLoading,
+      contractsReady,
+      connectWallet,
+      disconnectWallet,
+      updateProfile,
+      getProfile,
+      checkContractsReady,
+    }}>
       {children}
     </StateContext.Provider>
   );
 };
-
-export const useStateContext = () => useContext(StateContext);

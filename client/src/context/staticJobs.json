@@ -1,0 +1,45 @@
+[
+    {
+      "id": 1,
+      "title": "Frontend Developer Needed",
+      "description": "Build a responsive React dashboard.",
+      "budget": "5",
+      "owner": "0x123...abc",
+      "milestones": [
+        {
+          "id": 1,
+          "description": "Initial UI Design",
+          "amount": "10",
+          "status": 0
+        },
+        {
+          "id": 2,
+          "description": "Backend API Integration",
+          "amount": "20",
+          "status": 1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Smart Contract Audit",
+      "description": "Review and audit an Ethereum smart contract.",
+      "budget": "3",
+      "owner": "0x456...def",
+      "milestones": [
+        {
+          "id": 3,
+          "description": "Review contract logic",
+          "amount": "1",
+          "status": 0
+        },
+        {
+          "id": 4,
+          "description": "Write test cases",
+          "amount": "2",
+          "status": 0
+        }
+      ]
+    }
+  ]
+  
